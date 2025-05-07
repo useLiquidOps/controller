@@ -247,7 +247,9 @@ Handlers.add(
     local reserveFactor = tonumber(msg.Tags["Reserve-Factor"])
     local baseRate = tonumber(msg.Tags["Base-Rate"])
     local initRate = tonumber(msg.Tags["Init-Rate"])
+    local jumpRate = tonumber(msg.Tags["Jump-Rate"])
     local cooldownPeriod = tonumber(msg.Tags["Cooldown-Period"])
+    local kinkParam = tonumber(msg.Tags["Kink-Param"])
 
     assert(
       collateralFactor ~= nil and type(collateralFactor) == "number",
@@ -286,12 +288,24 @@ Handlers.add(
       "Invalid init rate"
     )
     assert(
+      jumpRate ~= nil and assertions.isValidNumber(jumpRate),
+      "Invalid jump rate"
+    )
+    assert(
       assertions.isTokenQuantity(msg.Tags["Value-Limit"]),
       "Invalid value limit"
     )
     assert(
-      cooldownPeriod ~= nil and assertions.isValidNumber(cooldownPeriod),
+      cooldownPeriod ~= nil and assertions.isValidInteger(cooldownPeriod),
       "Invalid cooldown period"
+    )
+    assert(
+      kinkParam ~= nil and type(kinkParam) == "number",
+      "Invalid kink parameter"
+    )
+    assert(
+      kinkParam // 1 == kinkParam and kinkParam >= 0 and kinkParam <= 100,
+      "Kink parameter has to be a whole percentage between 0 and 100"
     )
 
     -- check if token is supported
@@ -314,6 +328,8 @@ Handlers.add(
       ["Reserve-Factor"] = tostring(reserveFactor),
       ["Base-Rate"] = msg.Tags["Base-Rate"],
       ["Init-Rate"] = msg.Tags["Init-Rate"],
+      ["Jump-Rate"] = msg.Tags["Jump-Rate"],
+      ["Kink-Param"] = msg.Tags["Kink-Param"],
       ["Value-Limit"] = msg.Tags["Value-Limit"],
       ["Cooldown-Period"] = msg.Tags["Cooldown-Period"],
       Oracle = Oracle,
@@ -1041,7 +1057,16 @@ end
 -- Checks if an input is not inf or nan
 ---@param val number Input to check
 function assertions.isValidNumber(val)
-  return val == val and val % 1 == 0
+  return type(val) == "number" and
+    val == val and
+    val ~= math.huge and
+    val ~= -math.huge
+end
+
+-- Checks if an input is not inf or nan and is an integer
+---@param val number Input to check
+function assertions.isValidInteger(val)
+  return assertions.isValidNumber(val) and val % 1 == 0
 end
 
 -- Validates if the provided value can be parsed as a Bint
@@ -1056,7 +1081,7 @@ function assertions.isBintRaw(val)
       end
 
       -- check if the val is an integer and not infinity, in case if the type is number
-      if type(val) == "number" and not assertions.isValidNumber(val) then
+      if type(val) == "number" and not assertions.isValidInteger(val) then
         return false
       end
 
