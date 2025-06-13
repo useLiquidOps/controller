@@ -534,10 +534,6 @@ Handlers.add(
         "Invalid liquidator address"
       )
       assert(
-        liquidatedToken ~= rewardToken,
-        "Can't liquidate for the same token"
-      )
-      assert(
         assertions.isAddress(rewardToken),
         "Invalid reward token address"
       )
@@ -1304,7 +1300,7 @@ function oracle.getUSDDenomination() return 12 end
 -- Get the fractional part's length
 ---@param val number Full number
 function oracle.getFractionsCount(val)
-  -- check if there is a fractional part 
+  -- check if there is a fractional part
   -- by trying to find it with a pattern
   local fractionalPart = string.match(oracle.floatToString(val), "%.(.*)")
 
