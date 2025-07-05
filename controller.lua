@@ -425,16 +425,21 @@ Handlers.add(
     -- check if update is already in progress
     assert(not UpdateInProgress, "An update is already in progress")
 
+    -- allow skipping oTokens
+    local skip = msg.Tags.Skip and json.decode(msg.Tags.Skip)
+
     -- generate update msgs
     ---@type MessageParam[]
     local updateMsgs = {}
 
     for _, t in ipairs(Tokens) do
-      table.insert(updateMsgs, {
-        Target = t.oToken,
-        Action = "Update",
-        Data = msg.Data
-      })
+      if not skip or utils.includes(t.oToken, skip) then
+        table.insert(updateMsgs, {
+          Target = t.oToken,
+          Action = "Update",
+          Data = msg.Data
+        })
+      end
     end
 
     -- set updating in progress. this will halt interactions
