@@ -561,7 +561,7 @@ Handlers.add(
 
       for _, t in ipairs(Tokens) do
         if t.id == liquidatedToken then oTokensParticipating.liquidated = t.oToken
-        elseif t.id == rewardToken then oTokensParticipating.reward = t.oToken end
+        if t.id == rewardToken then oTokensParticipating.reward = t.oToken end
 
         table.insert(positionMsgs, {
           Target = t.oToken,
