@@ -609,7 +609,6 @@ Handlers.add(
       -- the total collateral of the desired reward token
       -- in the user's position for the reward token
       local availableRewardQty = zero
-      local availableLiquidateQty = zero
 
       -- the total borrow of the liquidated token in the
       -- user's position
@@ -630,7 +629,9 @@ Handlers.add(
         if pos.From == oTokensParticipating.liquidated then
           inTokenData = { ticker = symbol, denomination = denomination }
           availableLiquidateQty = borrowBalance
-        elseif pos.From == oTokensParticipating.reward then
+        end
+
+        if pos.From == oTokensParticipating.reward then
           outTokenData = { ticker = symbol, denomination = denomination }
           availableRewardQty = bint(pos.Tags.Collateralization or 0)
         end
