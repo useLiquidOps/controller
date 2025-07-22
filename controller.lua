@@ -910,13 +910,21 @@ Handlers.add(
       return msg.reply({ Error = "Invalid user address" })
     end
 
+    local isQueued = utils.find(
+      function (u) return u.address == user end,
+      Queue
+    ) ~= nil
+
     -- check if the user has already been added
-    if utils.includes(user, Queue) or UpdateInProgress then
+    if isQueued or UpdateInProgress then
       return msg.reply({ Error = "User already queued" })
     end
 
     -- add to queue
-    table.insert(Queue, user)
+    table.insert(Queue, {
+      address = user,
+      oToken = msg.From
+    })
 
     msg.reply({ ["Queued-User"] = user })
   end
@@ -939,12 +947,29 @@ Handlers.add(
       return msg.reply({ Error = "Invalid user address" })
     end
 
-    -- filter out user
-    Queue = utils.filter(
-      function (v) return v ~= user end,
-      Queue
-    )
+    -- find entry to remove
+    local idx = nil
 
+    for i, entry in ipairs(Queue) do
+      if entry.address == user then
+        -- do not remove from the queue if the user was queued by another oToken
+        if entry.oToken ~= msg.From then
+          return msg.reply({ Error = "The user was queued by another oToken" })
+        end
+
+        idx = i
+      end
+    end
+
+    -- error if the user was not found in the queue
+    if not idx then
+      return msg.reply({ Error = "The user is not queued" })
+    end
+
+    -- remove from queue table
+    table.remove(Queue, idx)
+
+    -- reply with confirmation
     msg.reply({ ["Unqueued-User"] = user })
   end
 )
