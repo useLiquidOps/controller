@@ -32,8 +32,24 @@ ProtocolLogo = ProtocolLogo or ""
 Tokens = Tokens or {}
 
 -- queue for operations that change the user's position
----@type string[]
+---@type { address: string, oToken: string }[]
 Queue = Queue or {}
+
+-- Check if an address is queued
+---@param addr string User address
+---@param oToken string? Optional oToken to verify
+function Queue.isQueued(addr, oToken)
+  return utils.find(
+    function (u)
+      if oToken ~= nil and u.oToken ~= oToken then
+        return false
+      end
+
+      return u.address == addr
+    end,
+    Queue
+  ) ~= nil
+end
 
 -- current timestamp
 Timestamp = Timestamp or 0
@@ -588,7 +604,7 @@ Handlers.add(
 
       -- check queue
       assert(
-        not utils.includes(target, Queue),
+        not Queue.isQueued(target),
         "User is queued for an operation"
       )
 
@@ -777,9 +793,9 @@ Handlers.add(
         "Could not meet the defined slippage"
       )
 
-      -- check liquidation queue
+      -- check queue
       assert(
-        not utils.includes(target, Queue),
+        not Queue.isQueued(target),
         "User is already queued for liquidation"
       )
 
@@ -818,7 +834,10 @@ Handlers.add(
     -- queue the liquidation at this point, because
     -- the user position has been checked, so the liquidation is valid
     -- we don't want anyone to be able to liquidate from this point
-    table.insert(Queue, target)
+    table.insert(Queue, {
+      address = target,
+      oToken = ao.id
+    })
 
     -- TODO: timeout here? (what if this doesn't return in time, the liquidation remains in a pending state)
     -- TODO: this timeout can be done with a Handler that removed this coroutine
@@ -851,7 +870,7 @@ Handlers.add(
 
     -- remove from queue
     Queue = utils.filter(
-      function (v) return v ~= target end,
+      function (u) return u.address ~= target end,
       Queue
     )
 
@@ -910,13 +929,8 @@ Handlers.add(
       return msg.reply({ Error = "Invalid user address" })
     end
 
-    local isQueued = utils.find(
-      function (u) return u.address == user end,
-      Queue
-    ) ~= nil
-
     -- check if the user has already been added
-    if isQueued or UpdateInProgress then
+    if Queue.isQueued(user) or UpdateInProgress then
       return msg.reply({ Error = "User already queued" })
     end
 
@@ -988,7 +1002,7 @@ Handlers.add(
     -- the user is queued if they're either in the collateral
     -- or the liquidation queues
     return msg.reply({
-      ["In-Queue"] = json.encode(utils.includes(user, Queue) or UpdateInProgress)
+      ["In-Queue"] = json.encode(Queue.isQueued(user) or UpdateInProgress)
     })
   end
 )
