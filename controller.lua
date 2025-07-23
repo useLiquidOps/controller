@@ -8,6 +8,7 @@ local assertions = {}
 local scheduler = {}
 local oracle = {}
 local tokens = {}
+local queue = {}
 
 -- oToken module ID
 Module = Module or "C6CQfrL29jZ-LYXV2lKn09d3pBIM6adDFwWqh2ICikM"
@@ -32,24 +33,8 @@ ProtocolLogo = ProtocolLogo or ""
 Tokens = Tokens or {}
 
 -- queue for operations that change the user's position
----@type { address: string, oToken: string }[]
+---@type { address: string, origin: string }[]
 Queue = Queue or {}
-
--- Check if an address is queued
----@param addr string User address
----@param oToken string? Optional oToken to verify
-function Queue.isQueued(addr, oToken)
-  return utils.find(
-    function (u)
-      if oToken ~= nil and u.oToken ~= oToken then
-        return false
-      end
-
-      return u.address == addr
-    end,
-    Queue
-  ) ~= nil
-end
 
 -- current timestamp
 Timestamp = Timestamp or 0
@@ -604,7 +589,7 @@ Handlers.add(
 
       -- check queue
       assert(
-        not Queue.isQueued(target),
+        not queue.isQueued(target),
         "User is queued for an operation"
       )
 
@@ -795,7 +780,7 @@ Handlers.add(
 
       -- check queue
       assert(
-        not Queue.isQueued(target),
+        not queue.isQueued(target),
         "User is already queued for liquidation"
       )
 
@@ -834,10 +819,7 @@ Handlers.add(
     -- queue the liquidation at this point, because
     -- the user position has been checked, so the liquidation is valid
     -- we don't want anyone to be able to liquidate from this point
-    table.insert(Queue, {
-      address = target,
-      oToken = ao.id
-    })
+    queue.add(target, ao.id)
 
     -- TODO: timeout here? (what if this doesn't return in time, the liquidation remains in a pending state)
     -- TODO: this timeout can be done with a Handler that removed this coroutine
@@ -868,11 +850,8 @@ Handlers.add(
       ["Liquidation-Reference"] = liquidationReference
     })
 
-    -- remove from queue
-    Queue = utils.filter(
-      function (u) return u.address ~= target end,
-      Queue
-    )
+    -- remove from queue (discard result - if we get to this point, the user should be queued by the controller)
+    queue.remove(target, ao.id)
 
     -- check loan liquidation result
     -- (at this point, we do not need to refund the user
@@ -930,15 +909,12 @@ Handlers.add(
     end
 
     -- check if the user has already been added
-    if Queue.isQueued(user) or UpdateInProgress then
+    if queue.isQueued(user) or UpdateInProgress then
       return msg.reply({ Error = "User already queued" })
     end
 
     -- add to queue
-    table.insert(Queue, {
-      address = user,
-      oToken = msg.From
-    })
+    queue.add(user, msg.From)
 
     msg.reply({ ["Queued-User"] = user })
   end
@@ -961,27 +937,16 @@ Handlers.add(
       return msg.reply({ Error = "Invalid user address" })
     end
 
-    -- find entry to remove
-    local idx = nil
+    -- try to remove the user from the queue
+    local res = queue.remove(user, msg.From)
 
-    for i, entry in ipairs(Queue) do
-      if entry.address == user then
-        -- do not remove from the queue if the user was queued by another oToken
-        if entry.oToken ~= msg.From then
-          return msg.reply({ Error = "The user was queued by another oToken" })
-        end
-
-        idx = i
-      end
+    if res ~= "removed" then
+      return msg.reply({
+        Error = res == "not_queued" and
+          "The user is not queued" or
+          "The user was queued from another origin"
+      })
     end
-
-    -- error if the user was not found in the queue
-    if not idx then
-      return msg.reply({ Error = "The user is not queued" })
-    end
-
-    -- remove from queue table
-    table.remove(Queue, idx)
 
     -- reply with confirmation
     msg.reply({ ["Unqueued-User"] = user })
@@ -1002,7 +967,7 @@ Handlers.add(
     -- the user is queued if they're either in the collateral
     -- or the liquidation queues
     return msg.reply({
-      ["In-Queue"] = json.encode(Queue.isQueued(user) or UpdateInProgress)
+      ["In-Queue"] = json.encode(queue.isQueued(user) or UpdateInProgress)
     })
   end
 )
@@ -1019,6 +984,62 @@ Handlers.add(
     })
   end
 )
+
+-- Add a user to the queue list
+---@param addr string User address
+---@param origin string Queue request origin
+function queue.add(addr, origin)
+  table.insert(Queue, {
+    address = addr,
+    origin = origin
+  })
+end
+
+-- Remove a user from the queue list, if the origin matches
+---@param addr string User address
+---@param origin string Queue request origin
+---@return "removed"|"not_queued"|"invalid_origin"
+function queue.remove(addr, origin)
+  -- find entry to remove
+  local idx = nil
+
+  for i, entry in ipairs(Queue) do
+    if entry.address == addr then
+      -- different origin
+      if entry.origin ~= origin then
+        return "invalid_origin"
+      end
+
+      idx = i
+    end
+  end
+
+  -- the address was not found in the queue
+  if not idx then
+    return "not_queued"
+  end
+
+  -- remove from queue table
+  table.remove(Queue, idx)
+
+  return "removed"
+end
+
+-- Check if an address is queued
+---@param addr string User address
+---@param origin string? Optional origin to verify against
+function queue.isQueued(addr, origin)
+  return utils.find(
+    function (u)
+      if origin ~= nil and u.origin ~= origin then
+        return false
+      end
+
+      return u.address == addr
+    end,
+    Queue
+  ) ~= nil
+end
 
 -- Removes an auction with a cooldown
 ---@param target string Auction target address
