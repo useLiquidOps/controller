@@ -36,8 +36,9 @@ Tokens = Tokens or {}
 ---@type { address: string, origin: string }[]
 Queue = Queue or {}
 
--- current timestamp
+-- current timestamp and block
 Timestamp = Timestamp or 0
+Block = Block or 0
 
 -- cached auctions (position wallet address, timestamp when discovered)
 ---@type table<string, number>
