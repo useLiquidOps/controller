@@ -116,6 +116,10 @@ Handlers.add(
   auctions.list
 )
 
+--
+-- Setup queue handlers
+--
+
 Handlers.add(
   "add-queue",
   queue.fromoToken({ Action = "Add-To-Queue" }),
