@@ -12,6 +12,15 @@ function mod.isoToken(addr)
   ) ~= nil
 end
 
+-- Check if a provided address is a listed token
+---@param addr string Token address to check
+function mod.isListedToken(addr)
+  return utils.find(
+    function (t) return t.id == addr end,
+    Tokens
+  ) ~= nil
+end
+
 -- Check if token is supported by the protocol
 -- (token supports aos 2.0 replies and replies with a proper info response)
 -- Returns if the token is supported and the token info

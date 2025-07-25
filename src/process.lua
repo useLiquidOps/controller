@@ -1,7 +1,14 @@
-local coroutine = require "coroutine"
-local bint = require ".bint"(1024)
-local utils = require ".utils"
-local json = require "json"
+local auctions = require ".interactions.auctions"
+local listing = require ".interactions.listing"
+local update = require ".interactions.update"
+local gate = require ".interactions.gate"
+local info = require ".interactions.info"
+
+local assertions = require ".utils.assertions"
+
+--
+-- Setup GLOBAL variables
+--
 
 -- oToken module ID
 Module = Module or "C6CQfrL29jZ-LYXV2lKn09d3pBIM6adDFwWqh2ICikM"
@@ -48,30 +55,88 @@ PrecisionFactor = 1000000
 -- minimum liquidation percentage (a liquidator is required to liquidate at least this percentage of the total loan)
 MinLiquidationThreshold = MinLiquidationThreshold or 20
 
+--
+-- Types
+--
+
 ---@alias TokenData { ticker: string, denomination: number }
 ---@alias PriceParam { ticker: string, quantity: Bint?, denomination: number }
 ---@alias CollateralBorrow { token: string, ticker: string, quantity: string }
 ---@alias QualifyingPosition { target: string, depts: CollateralBorrow[], collaterals: CollateralBorrow[], discount: string }
 ---@alias Friend { id: string, ticker: string, oToken: string, denomination: number }
 
+--
+-- Setup handlers
+--
+
 Handlers.add(
   "sync-timestamp",
   function () return "continue" end,
-  function (msg) Timestamp = msg.Timestamp end
+  gate.sync
+)
+Handlers.add(
+  "refund-invalid",
+  function (msg)
+    return msg.Tags.Action == "Credit-Notice" and
+      msg.Tags["X-Action"] ~= "Liquidate"
+  end,
+  gate.refundInvalidToken
 )
 
 Handlers.add(
   "info",
   { Action = "Info" },
-  function (msg)
-    msg.reply({
-      Name = "LiquidOps Controller",
-      Module = Module,
-      Oracle = Oracle,
-      ["Max-Discount"] = tostring(MaxDiscount),
-      ["Min-Discount"] = tostring(MinDiscount),
-      ["Discount-Interval"] = tostring(DiscountInterval),
-      Data = json.encode(Tokens)
-    })
-  end
+  info.info
+)
+Handlers.add(
+  "get-tokens",
+  { Action = "Get-Tokens" },
+  info.tokens
+)
+Handlers.add(
+  "get-oracle",
+  { Action = "Get-Oracle" },
+  info.oracle
+)
+Handlers.add(
+  "get-queue",
+  { Action = "Get-Queue" },
+  info.queue
+)
+
+Handlers.add(
+  "liquidate",
+  { Action = "Credit-Notice", ["X-Action"] = "Liquidate" },
+  auctions.liquidate
+)
+Handlers.add(
+  "get-auctions",
+  { Action = "Get-Auctions" },
+  auctions.list
+)
+
+--
+-- Setup admin handlers
+--
+
+Handlers.add(
+  "list",
+  assertions.isAdminAction("List"),
+  listing.list
+)
+Handlers.add(
+  "unlist",
+  assertions.isAdminAction("Unlist"),
+  listing.unlist
+)
+
+Handlers.add(
+  "batch-update",
+  assertions.isAdminAction("Batch-Update"),
+  update.batchUpdate
+)
+Handlers.add(
+  "solo-update",
+  assertions.isAdminAction("Solo-Update"),
+  update.soloUpdate
 )
