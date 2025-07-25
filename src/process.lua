@@ -1,6 +1,7 @@
 local auctions = require ".interactions.auctions"
 local listing = require ".interactions.listing"
 local update = require ".interactions.update"
+local queue = require ".interactions.queue"
 local gate = require ".interactions.gate"
 local info = require ".interactions.info"
 
@@ -113,6 +114,22 @@ Handlers.add(
   "get-auctions",
   { Action = "Get-Auctions" },
   auctions.list
+)
+
+Handlers.add(
+  "add-queue",
+  queue.fromoToken({ Action = "Add-To-Queue" }),
+  queue.add
+)
+Handlers.add(
+  "remove-queue",
+  queue.fromoToken({ Action = "Remove-From-Queue" }),
+  queue.remove
+)
+Handlers.add(
+  "check-queue",
+  { Action = "Check-Queue-For" },
+  queue.check
 )
 
 --
