@@ -269,7 +269,7 @@ Handlers.add(
       "Liquidation threshold has to be a whole percentage between 0 and 100"
     )
     assert(
-      liquidationThreshold > collateralFactor,
+      liquidationThreshold > collateralFactor or liquidationThreshold == 0 and collateralFactor == 0,
       "Liquidation threshold must be greater than the collateral factor"
     )
     assert(
