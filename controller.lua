@@ -61,6 +61,26 @@ MinLiquidationThreshold = MinLiquidationThreshold or 20
 ---@alias QualifyingPosition { target: string, depts: CollateralBorrow[], collaterals: CollateralBorrow[], discount: string }
 
 Handlers.add(
+  "setup-patching",
+  function () return "continue" end,
+  function (msg)
+    ao.send({
+      device = "patch@1.0",
+      ["token-info"] = { name = "LiquidOps Controller" },
+      oracle = oracle,
+      ["discount-config"] = {
+        min = MinDiscount,
+        max = MaxDiscount,
+        interval = DiscountInterval
+      },
+      tokens = Tokens,
+      queue = Queue,
+      auctions = Auctions
+    })
+  end
+)
+
+Handlers.add(
   "sync-timestamp",
   function () return "continue" end,
   function (msg) Timestamp = msg.Timestamp end
@@ -993,6 +1013,10 @@ function queue.add(addr, origin)
     address = addr,
     origin = origin
   })
+  ao.send({
+    device = "patch@1.0",
+    queue = Queue
+  })
 end
 
 -- Remove a user from the queue list, if the origin matches
@@ -1021,6 +1045,12 @@ function queue.remove(addr, origin)
 
   -- remove from queue table
   table.remove(Queue, idx)
+
+  -- patch
+  ao.send({
+    device = "patch@1.0",
+    queue = Queue
+  })
 
   return "removed"
 end
@@ -1058,7 +1088,15 @@ function liquidations.removeAuction(target)
       end
       return false
     end,
-    function () Auctions[target] = nil end
+    function ()
+      Auctions[target] = nil
+
+      -- patch
+      ao.send({
+        device = "patch@1.0",
+        auctions = Auctions
+      })
+    end
   )
 end
 
@@ -1072,6 +1110,12 @@ function liquidations.addAuction(target, discovered)
   -- add discovery date if the user isn't already in auctions
   if Auctions[target] == nil then
     Auctions[target] = discovered
+
+    -- patch
+    ao.send({
+      device = "patch@1.0",
+      auctions = { [target] = discovered }
+    })
   end
 end
 
