@@ -67,7 +67,7 @@ Handlers.add(
     ao.send({
       device = "patch@1.0",
       ["token-info"] = { name = "LiquidOps Controller" },
-      oracle = oracle,
+      oracle = Oracle,
       ["discount-config"] = {
         min = MinDiscount,
         max = MaxDiscount,
